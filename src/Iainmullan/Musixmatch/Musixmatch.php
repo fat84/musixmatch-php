@@ -3,12 +3,18 @@
 namespace Iainmullan\Musixmatch;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Subscriber\Cache\CacheSubscriber;
+use GuzzleHttp\Subscriber\Cache\CacheStorage;
+use GuzzleHttp\Subscriber\Cache\DefaultCacheStorage;
+
+use Doctrine\Common\Cache\FilesystemCache;
 
 class Musixmatch {
 
 	private $client;
+	public $response;
 
-	function __construct($apiKey) {
+	function __construct($apiKey, $cacheDir = false, $cacheLength = 3600) {
 
 		$this->client = new Client([
 		    'base_url' => ['http://api.musixmatch.com/ws/{version}/', ['version' => '1.1']],
@@ -17,15 +23,29 @@ class Musixmatch {
 		    ]
 		]);
 
+		if ($cacheDir !== false) {
+
+		    $storage = new CacheStorage(
+		        new FilesystemCache($cacheDir), '.musix', $cacheLength
+			);
+
+			CacheSubscriber::attach($this->client, array(
+				'storage' => $storage,
+			));
+
+		}
+
 	}
 
 	public function method($methodName, $params = array()) {
-		
-		$response = $this->client->get($methodName, [
+
+		$request = $this->client->createRequest('GET', $methodName, [
 			'query' => $params
 		]);
 
-		$data = $response->getBody();
+		$this->response = $this->client->send($request);
+
+		$data = $this->response->getBody();
 
 		if (!$data) {
 			return FALSE;
